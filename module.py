@@ -1,6 +1,8 @@
 from torch import nn
-from attention import scale_dot_product_attention
 from positional_encoding import sin_encoding
+from attention import scale_dot_product_attention
+from layer_norm import layer_normalization
+
 
 # test
 import torch
@@ -13,6 +15,7 @@ class EncoderLayer(nn.Module):
         self.wv = nn.Linear(256, 64, bias=False)
         self.attention = scale_dot_product_attention
         self.feedforward = None
+        self.layer_norm = layer_normalization
     
     def forward(self, x):
         q = self.wq(x)
