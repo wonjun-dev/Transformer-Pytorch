@@ -1,4 +1,3 @@
-
 from torchtext.datasets import Multi30k
 import pytorch_lightning as pl
 
