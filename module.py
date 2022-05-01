@@ -1,5 +1,4 @@
 from torch import nn
-from positional_encoding import sin_encoding
 from attention import scale_dot_product_attention
 from layer_norm import layer_normalization
 
@@ -8,11 +7,11 @@ from layer_norm import layer_normalization
 import torch
 
 class EncoderLayer(nn.Module):
-    def __init__(self):
+    def __init__(self, d_model):
         super().__init__()
-        self.wq = nn.Linear(256, 64, bias=False)
-        self.wk = nn.Linear(256, 64, bias=False)
-        self.wv = nn.Linear(256, 64, bias=False)
+        self.wq = nn.Linear(d_model, 64, bias=False)
+        self.wk = nn.Linear(d_model, 64, bias=False)
+        self.wv = nn.Linear(d_model, 64, bias=False)
         self.attention = scale_dot_product_attention
         self.feedforward = None
         self.layer_norm = layer_normalization
@@ -36,15 +35,13 @@ class DecoderLayer(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, n=6):
+    def __init__(self, d_model, n=1):   # TODO N stack 
         super().__init__()
-        self.pos_encoding = sin_encoding
         self.layer = nn.Sequential()
         for i in range(n):
-            self.layer.add_module(f'EncoderLayer_{i}', EncoderLayer())
+            self.layer.add_module(f'EncoderLayer_{i}', EncoderLayer(d_model=d_model))
 
     def forward(self, x):
-        x = self.pos_encoding(x)
         x = self.layer(x)
         return x
 
