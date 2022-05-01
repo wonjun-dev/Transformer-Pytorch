@@ -8,12 +8,17 @@ class PositionalEncoding():
         self.pe = self.encoding()
 
     def encoding(self):
+        """
+        Return
+            pe: (torch.tensor) |  (1, max_len, d_model)
+        """
         pe = torch.zeros(self.max_len, self.d_model)
         position = torch.arange(self.max_len).unsqueeze(1)
         exponent = torch.arange(0, self.d_model, 2) / self.d_model
         div = torch.pow(10000*torch.ones_like(exponent), exponent)
         pe[:, ::2] = torch.sin(position / div)
         pe[:, 1::2] = torch.cos(position / div)
+        pe.unsqueeze_(0)
 
         return pe
 
