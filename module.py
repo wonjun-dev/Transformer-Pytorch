@@ -1,6 +1,5 @@
 from torch import nn
 from attention import scale_dot_product_attention
-from layer_norm import layer_normalization
 
 
 # test
@@ -9,12 +8,12 @@ import torch
 class EncoderLayer(nn.Module):
     def __init__(self, d_model):
         super().__init__()
-        self.wq = nn.Linear(d_model, 64, bias=False)
+        self.wq = nn.Linear(d_model, 64, bias=False)    # 2번째 차원: d_model/n_head
         self.wk = nn.Linear(d_model, 64, bias=False)
         self.wv = nn.Linear(d_model, 64, bias=False)
         self.attention = scale_dot_product_attention
         self.feedforward = None
-        self.layer_norm = layer_normalization
+        self.layer_norm = nn.LayerNorm(64)  # embedding_dim 
     
     def forward(self, x):
         q = self.wq(x)
@@ -22,6 +21,7 @@ class EncoderLayer(nn.Module):
         v = self.wq(x)
         
         x = self.attention(q, k, v)
+        x = self.layer_norm(x)
         # x = self.feedforward(x)
         return x
 
@@ -35,10 +35,10 @@ class DecoderLayer(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, d_model, n=1):   # TODO N stack 
+    def __init__(self, d_model, n_stack=1):   # TODO N stack 
         super().__init__()
         self.layer = nn.Sequential()
-        for i in range(n):
+        for i in range(n_stack):
             self.layer.add_module(f'EncoderLayer_{i}', EncoderLayer(d_model=d_model))
 
     def forward(self, x):
