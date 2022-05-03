@@ -8,19 +8,24 @@ import torch
 class EncoderLayer(nn.Module):
     def __init__(self, d_model):
         super().__init__()
-        self.wq = nn.Linear(d_model, 64, bias=False)    # 2번째 차원: d_model/n_head
-        self.wk = nn.Linear(d_model, 64, bias=False)
-        self.wv = nn.Linear(d_model, 64, bias=False)
+        self.wq = nn.Linear(d_model, 512, bias=False)    # 2번째 차원: d_model/n_head
+        self.wk = nn.Linear(d_model, 512, bias=False)
+        self.wv = nn.Linear(d_model, 512, bias=False)
         self.attention = scale_dot_product_attention
         self.feedforward = None
-        self.layer_norm = nn.LayerNorm(64)  # embedding_dim 
+        self.layer_norm = nn.LayerNorm(512)  # embedding_dim 
     
     def forward(self, x):
+        # residual connection
+        identity = x
+
+        # attention query, key, value
         q = self.wq(x)
         k = self.wq(x)
         v = self.wq(x)
         
-        x = self.attention(q, k, v)
+        x = self.attention(q, k, v) # TODO multi head attention
+        x = x + identity # residual connection
         x = self.layer_norm(x)
         # x = self.feedforward(x)
         return x
