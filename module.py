@@ -1,4 +1,5 @@
 from torch import nn
+import torch.nn.functional as F
 from attention import scale_dot_product_attention
 
 
@@ -11,14 +12,15 @@ class EncoderLayer(nn.Module):
         self.wq = nn.Linear(d_model, 512, bias=False)    # 2번째 차원: d_model/n_head
         self.wk = nn.Linear(d_model, 512, bias=False)
         self.wv = nn.Linear(d_model, 512, bias=False)
+        self.ff_1 = nn.Linear(512, 2048) # d_ff = 2048
+        self.ff_2 = nn.Linear(2048, 512)
         self.attention = scale_dot_product_attention
-        self.feedforward = None
-        self.layer_norm = nn.LayerNorm(512)  # embedding_dim 
+        self.layer_norm_1 = nn.LayerNorm(512)  # embedding_dim 
+        self.layer_norm_2 = nn.LayerNorm(512)  # embedding_dim 
     
     def forward(self, x):
-        # residual connection
-        identity = x
-
+        # sublayer 1 #
+        identity = x # residual connection
         # attention query, key, value
         q = self.wq(x)
         k = self.wq(x)
@@ -26,8 +28,15 @@ class EncoderLayer(nn.Module):
         
         x = self.attention(q, k, v) # TODO multi head attention
         x = x + identity # residual connection
-        x = self.layer_norm(x)
-        # x = self.feedforward(x)
+        x = self.layer_norm_1(x)
+
+        # sublayer 2 #
+        identity = x # residual connection
+        # feedforward
+        x = self.ff_2(F.relu(self.ff_1(x))) # FFN(x) = max(0, xW1+b1)W2+b2
+        x = x + identity
+        x = self.layer_norm_2(x)
+        
         return x
 
 
