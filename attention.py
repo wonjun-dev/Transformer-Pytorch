@@ -9,9 +9,8 @@ def scale_dot_product_attention(Q, K, V):
     # output QK^TV -> (N, S, E)
     scale = math.sqrt(K.size()[-1])
     scaled_weight = torch.matmul(Q, K.transpose(2, 1).contiguous()) / scale    # (QK^T)/scale -> (N, S, S), transpose 결과 contiguous 하지 않음.
-    softmax = F.softmax(scaled_weight.reshape(scaled_weight.size(0), -1), dim=1).view_as(scaled_weight) # N개의 (S, S) softmax 
+    softmax= F.softmax(scaled_weight, dim=-1)
     attention = torch.matmul(softmax, V) 
-
     return attention
     
 
