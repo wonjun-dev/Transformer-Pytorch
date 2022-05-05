@@ -88,7 +88,7 @@ class DecoderLayer(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, d_model, n_stack=1):   # TODO N stack 
+    def __init__(self, d_model, n_stack=6):
         super().__init__()
         self.layer = nn.Sequential()
         for i in range(n_stack):
@@ -100,7 +100,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, d_model, n_stack=1): # TODO N stack 
+    def __init__(self, d_model, n_stack=6):
         super().__init__()
         self.layer = MultiInputSequential()
         for i in range(n_stack):
@@ -113,12 +113,12 @@ class Decoder(nn.Module):
 
 if __name__ == '__main__':
     input = torch.rand(2, 5, 512)
-    el = EncoderLayer(512)
-    out = el(input)
-    print(out)
-    print(out.size())
+    # el = EncoderLayer(512)
+    # out = el(input)
+    # print(out)
+    # print(out.size())
 
     dl = DecoderLayer(512)
-    out = dl(input)
+    out = dl(input, input)
     print(out)
     print(out.size())
