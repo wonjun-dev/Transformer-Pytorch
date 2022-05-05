@@ -11,7 +11,7 @@ class Transformer(pl.LightningModule):
         super().__init__()
         self.pe = PositionalEncoding(max_len, d_model).encoding()
         self.encoder = Encoder(d_model=d_model)
-        self.decoder = Decoder()
+        self.decoder = Decoder(d_model=d_model)
 
     def forward(self, x):
         x = x + self.pe
