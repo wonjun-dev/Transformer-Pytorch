@@ -1,5 +1,3 @@
-from matplotlib import scale
-from numpy import identity
 from torch import nn
 import torch.nn.functional as F
 from attention import scale_dot_product_attention
