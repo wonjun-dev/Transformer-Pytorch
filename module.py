@@ -82,7 +82,7 @@ class DecoderLayer(nn.Module):
         identity = x
         x = self.ff_2(F.relu(self.ff_1(x))) # FFN(x) = max(0, xW1+b1)W2+b2
         x = x + identity
-        x = self.layer_norm_2(x)
+        x = self.layer_norm_3(x)
 
         return x
 
