@@ -11,7 +11,7 @@ def main():
     dummy_src = torch.rand((32, 10, 512)) # N, S, E
     dummy_tgt = torch.rand((32, 10, 512))   
 
-    transformer = Transformer(max_len=10, d_model=512)
+    transformer = Transformer(max_len=10, d_model=512, vocab_size=1000)
     out = transformer(dummy_src, dummy_tgt)
     print(out.size())
     # trainer = pl.Trainer()
