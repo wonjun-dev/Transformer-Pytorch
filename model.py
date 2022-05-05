@@ -16,6 +16,7 @@ class Transformer(pl.LightningModule):
     def forward(self, x, tgt):
         x = x + self.pe
         x = self.encoder(x)
+        tgt = tgt + self.pe
         x = self.decoder(tgt, x)
         return x
         
