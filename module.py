@@ -1,6 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
 from attention import scale_dot_product_attention
+from utils import MultiInputSequential
 
 
 # test
@@ -43,25 +44,35 @@ class EncoderLayer(nn.Module):
 class DecoderLayer(nn.Module):
     def __init__(self, d_model):
         super().__init__()
-        self.wq = nn.Linear(d_model, 512, bias=False)
-        self.wk = nn.Linear(d_model, 512, bias=False)
-        self.wv = nn.Linear(d_model, 512, bias=False)
+        self.wq_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
+        self.wk_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
+        self.wv_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
+        self.wq_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
+        self.wk_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
+        self.wv_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
         self.attention = scale_dot_product_attention
         self.layer_norm_1 = nn.LayerNorm(512)
         self.layer_norm_2 = nn.LayerNorm(512)
         self.layer_norm_3 = nn.LayerNorm(512)
     
-    def forward(self, x):
+    def forward(self, x, enc_out):
         # sublayer 1 #
         identity = x # residual connection
         # attention query, key, value
-        q = self.wq(x)
-        k = self.wk(x)
-        v = self.wv(x)
+        q = self.wq_1(x)
+        k = self.wk_1(x)
+        v = self.wv_1(x)
 
         x = self.attention(q, k, v, masking=True)   # masked attention
         x = x + identity
         x = self.layer_norm_1(x)
+
+        # sublayer 2 #
+        identity = x
+        q = self.wq_2(x)
+        enc_k = self.wk_2(enc_out)
+        enc_v = self.wv_2(enc_out)
+        x = self.attention(q, enc_k, enc_v) # encoder-decoder attention
 
         return x
 
@@ -81,12 +92,12 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, d_model, n_stack=1): # TODO N stack 
         super().__init__()
-        self.layer = nn.Sequential()
+        self.layer = MultiInputSequential()
         for i in range(n_stack):
             self.layer.add_module(f'DecoderLayer_{i}', DecoderLayer(d_model=d_model))
 
-    def forward(self, x):
-        x = self.layer(x)
+    def forward(self, x, enc_out):
+        x = self.layer(x, enc_out)
         return x
 
 

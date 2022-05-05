@@ -13,10 +13,10 @@ class Transformer(pl.LightningModule):
         self.encoder = Encoder(d_model=d_model)
         self.decoder = Decoder(d_model=d_model)
 
-    def forward(self, x):
+    def forward(self, x, tgt):
         x = x + self.pe
         x = self.encoder(x)
-        # x = self.decoder(x)
+        x = self.decoder(tgt, x)
         return x
         
 

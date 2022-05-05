@@ -12,7 +12,7 @@ def main():
     dummy_tgt = torch.rand((32, 20, 512))   
 
     transformer = Transformer(max_len=10, d_model=512)
-    out = transformer(dummy_src)
+    out = transformer(dummy_src, dummy_tgt)
     print(out.size())
     # trainer = pl.Trainer()
     # trainer.fit(transformer)
