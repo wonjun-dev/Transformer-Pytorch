@@ -2,6 +2,7 @@ from typing import MutableMapping
 from torch import nn
 import torch.nn.functional as F
 from attention import MultiHeadAttention
+from attention import EncoderDecoderAttention
 from utils import MultiInputSequential
 
 
@@ -38,10 +39,7 @@ class DecoderLayer(nn.Module):
     def __init__(self, d_model, n_head):
         super().__init__()
         self.masked_attention_layer = MultiHeadAttention(d_model=d_model, n_head=n_head, masking=True)
-        self.attention_layer = MultiHeadAttention(d_model=d_model, n_head=n_head)
-        self.wq_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
-        self.wk_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
-        self.wv_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
+        self.ende_attention_layer = EncoderDecoderAttention(d_model=d_model, n_head=n_head)
         self.ff_1 = nn.Linear(512, 2048) # d_ff = 2048
         self.ff_2 = nn.Linear(2048, 512)
         self.layer_norm_1 = nn.LayerNorm(512)
@@ -57,10 +55,7 @@ class DecoderLayer(nn.Module):
 
         # sublayer 2 #  # TODO encoder-decoder mutli head attention
         identity = x
-        q = self.wq_2(x)
-        enc_k = self.wk_2(enc_out)
-        enc_v = self.wv_2(enc_out)
-        x = self.attention(q, enc_k, enc_v) # encoder-decoder attention
+        x = self.ende_attention_layer(x, enc_out)
         x = x + identity
         x = self.layer_norm_2(x)
 
@@ -86,11 +81,11 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, d_model, n_stack=6):
+    def __init__(self, d_model, n_stack=6, n_head=8):
         super().__init__()
         self.layer = MultiInputSequential()
         for i in range(n_stack):
-            self.layer.add_module(f'DecoderLayer_{i}', DecoderLayer(d_model=d_model))
+            self.layer.add_module(f'DecoderLayer_{i}', DecoderLayer(d_model=d_model, n_head=n_head))
 
     def forward(self, x, enc_out):
         x = self.layer(x, enc_out)
@@ -109,7 +104,12 @@ if __name__ == '__main__':
     print(out)
     print(out.size())
 
-    # dl = DecoderLayer(512)
-    # out = dl(input, input)
-    # print(out)
-    # print(out.size())
+    dl = DecoderLayer(512, 8)
+    out = dl(input, input)
+    print(out)
+    print(out.size())
+
+    de = Decoder(512, 6, 8)
+    out = de(input, input)
+    print(out)
+    print(out.size())

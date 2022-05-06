@@ -59,6 +59,32 @@ class MultiHeadAttention(nn.Module):
         return out
 
 
+class EncoderDecoderAttention(MultiHeadAttention):
+    def __init__(self, d_model, n_head):
+        super().__init__(d_model, n_head)
+        self.masking = False    # EncoderDecoderAttention 에서는 masking이 필요하지 않기 때문에 부모 클래스의 masking 변수 False 명시
+
+    def forward(self, x, enc_out):
+        q = self.wq(x)  # (batch_size, max_len, d_model)
+        k = self.wk(enc_out)  # (batch_size, max_len, d_model)
+        v = self.wv(enc_out)  # (batch_size, max_len, d_model)
+
+        # transform tensor # (batch_size, max_len, d_model) -> # (batch_size, n_head, max_len, d_k)
+        batch_size = q.size()[0]
+        max_len = q.size()[1]
+        d_k = self.d_model // self.n_head
+        q = q.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        k = k.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        v = v.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+
+        attention = self.scale_dot_product_attention(q, k, v)   # (batch_size, n_head, max_len, d_k)
+        attention = attention.transpose(2, 1).contiguous()
+        attention = attention.view(batch_size, max_len, -1) # Concat(head1, head2, ...)
+        out = self.linear(attention)
+
+        return out
+
+
 if __name__ == '__main__':
     dummy_src = torch.rand((2, 5, 8)) # (batch_size, max_len, d_model)
 
@@ -68,3 +94,6 @@ if __name__ == '__main__':
     masked_attention_layer = MultiHeadAttention(d_model=8, n_head=4, masking=True)
     out2 = masked_attention_layer(dummy_src)
     print(out2)
+    ende_attention_layer = EncoderDecoderAttention(8, 4)
+    out3 = ende_attention_layer(dummy_src, dummy_src)
+    print(out3)
