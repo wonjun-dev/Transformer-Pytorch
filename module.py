@@ -1,6 +1,7 @@
+from typing import MutableMapping
 from torch import nn
 import torch.nn.functional as F
-from attention import scale_dot_product_attention
+from attention import MultiHeadAttention
 from utils import MultiInputSequential
 
 
@@ -8,31 +9,23 @@ from utils import MultiInputSequential
 import torch
 
 class EncoderLayer(nn.Module):
-    def __init__(self, d_model):
+    def __init__(self, d_model, n_head):
         super().__init__()
-        self.wq = nn.Linear(d_model, 512, bias=False)    # 2번째 차원: d_model/n_head
-        self.wk = nn.Linear(d_model, 512, bias=False)
-        self.wv = nn.Linear(d_model, 512, bias=False)
-        self.ff_1 = nn.Linear(512, 2048) # d_ff = 2048
-        self.ff_2 = nn.Linear(2048, 512)
-        self.attention = scale_dot_product_attention
-        self.layer_norm_1 = nn.LayerNorm(512)  # embedding_dim 
-        self.layer_norm_2 = nn.LayerNorm(512)  # embedding_dim 
+        self.attention_layer = MultiHeadAttention(d_model=d_model, n_head=n_head)
+        self.ff_1 = nn.Linear(d_model, 2048) # d_ff = 2048
+        self.ff_2 = nn.Linear(2048, d_model)
+        self.layer_norm_1 = nn.LayerNorm(d_model)  # embedding_dim 
+        self.layer_norm_2 = nn.LayerNorm(d_model)  # embedding_dim 
     
     def forward(self, x):
         # sublayer 1 #
-        identity = x # residual connection
-        # attention query, key, value
-        q = self.wq(x)
-        k = self.wk(x)
-        v = self.wv(x)
-        
-        x = self.attention(q, k, v) # TODO multi head attention
+        identity = x
+        x = self.attention_layer(x)
         x = x + identity # residual connection
         x = self.layer_norm_1(x)
 
         # sublayer 2 #
-        identity = x # residual connection
+        identity = x
         # feedforward
         x = self.ff_2(F.relu(self.ff_1(x))) # FFN(x) = max(0, xW1+b1)W2+b2
         x = x + identity
@@ -42,17 +35,15 @@ class EncoderLayer(nn.Module):
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, d_model):
+    def __init__(self, d_model, n_head):
         super().__init__()
-        self.wq_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
-        self.wk_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
-        self.wv_1 = nn.Linear(d_model, 512, bias=False) # for self-attention
+        self.masked_attention_layer = MultiHeadAttention(d_model=d_model, n_head=n_head, masking=True)
+        self.attention_layer = MultiHeadAttention(d_model=d_model, n_head=n_head)
         self.wq_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
         self.wk_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
         self.wv_2 = nn.Linear(d_model, 512, bias=False) # for encoder-decoder attention
         self.ff_1 = nn.Linear(512, 2048) # d_ff = 2048
         self.ff_2 = nn.Linear(2048, 512)
-        self.attention = scale_dot_product_attention
         self.layer_norm_1 = nn.LayerNorm(512)
         self.layer_norm_2 = nn.LayerNorm(512)
         self.layer_norm_3 = nn.LayerNorm(512)
@@ -60,16 +51,11 @@ class DecoderLayer(nn.Module):
     def forward(self, x, enc_out):
         # sublayer 1 #
         identity = x # residual connection
-        # attention query, key, value
-        q = self.wq_1(x)
-        k = self.wk_1(x)
-        v = self.wv_1(x)
-
-        x = self.attention(q, k, v, masking=True)   # masked attention
+        x = self.masked_attention_layer(x)
         x = x + identity
         x = self.layer_norm_1(x)
 
-        # sublayer 2 #
+        # sublayer 2 #  # TODO encoder-decoder mutli head attention
         identity = x
         q = self.wq_2(x)
         enc_k = self.wk_2(enc_out)
@@ -88,11 +74,11 @@ class DecoderLayer(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, d_model, n_stack=6):
+    def __init__(self, d_model, n_stack=6, n_head=8):
         super().__init__()
         self.layer = nn.Sequential()
         for i in range(n_stack):
-            self.layer.add_module(f'EncoderLayer_{i}', EncoderLayer(d_model=d_model))
+            self.layer.add_module(f'EncoderLayer_{i}', EncoderLayer(d_model=d_model, n_head=n_head))
 
     def forward(self, x):
         x = self.layer(x)
@@ -113,12 +99,17 @@ class Decoder(nn.Module):
 
 if __name__ == '__main__':
     input = torch.rand(2, 5, 512)
-    # el = EncoderLayer(512)
-    # out = el(input)
-    # print(out)
-    # print(out.size())
-
-    dl = DecoderLayer(512)
-    out = dl(input, input)
+    el = EncoderLayer(512, 8)
+    out = el(input)
     print(out)
     print(out.size())
+
+    en = Encoder(512, 6, 8)
+    out = en(input)
+    print(out)
+    print(out.size())
+
+    # dl = DecoderLayer(512)
+    # out = dl(input, input)
+    # print(out)
+    # print(out.size())
