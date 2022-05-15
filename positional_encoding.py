@@ -20,6 +20,8 @@ class PositionalEncoding():
         pe[:, 1::2] = torch.cos(position / div)
         pe.unsqueeze_(0)
 
+        # TODO dropout
+
         return pe
 
 
