@@ -17,6 +17,7 @@ class EncoderLayer(nn.Module):
         self.ff_2 = nn.Linear(2048, d_model)
         self.layer_norm_1 = nn.LayerNorm(d_model)  # embedding_dim 
         self.layer_norm_2 = nn.LayerNorm(d_model)  # embedding_dim 
+        # TODO dropout
     
     def forward(self, x):
         # sublayer 1 #
@@ -45,6 +46,7 @@ class DecoderLayer(nn.Module):
         self.layer_norm_1 = nn.LayerNorm(512)
         self.layer_norm_2 = nn.LayerNorm(512)
         self.layer_norm_3 = nn.LayerNorm(512)
+        # TODO dropout
     
     def forward(self, x, enc_out):
         # sublayer 1 #
