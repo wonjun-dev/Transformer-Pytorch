@@ -71,15 +71,16 @@ class EncoderDecoderAttention(MultiHeadAttention):
 
         # transform tensor # (batch_size, max_len, d_model) -> # (batch_size, n_head, max_len, d_k)
         batch_size = q.size()[0]
-        max_len = q.size()[1]
+        src_max_len = k.size()[1]
+        tgt_max_len = q.size()[1]
         d_k = self.d_model // self.n_head
-        q = q.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        k = k.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        v = v.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        q = q.view(batch_size, tgt_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        k = k.view(batch_size, src_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        v = v.view(batch_size, src_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
 
         attention = self.scale_dot_product_attention(q, k, v)   # (batch_size, n_head, max_len, d_k)
         attention = attention.transpose(2, 1).contiguous()
-        attention = attention.view(batch_size, max_len, -1) # Concat(head1, head2, ...)
+        attention = attention.view(batch_size, tgt_max_len, -1) # Concat(head1, head2, ...)
         out = self.linear(attention)
 
         return out
