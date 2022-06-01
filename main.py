@@ -11,9 +11,9 @@ from data_manager import ToSentencePiece
 
 def main():
     train_iter, valid_iter, test_iter = Multi30k(split=('train', 'valid', 'test'), language_pair=('en', 'de'))
-    train_dataloader = DataLoader(train_iter, batch_size=32, collate_fn=ToSentencePiece())
-    valid_dataloader = DataLoader(valid_iter, batch_size=32, collate_fn=ToSentencePiece())
-    test_dataloader = DataLoader(test_iter, batch_size=32, collate_fn=ToSentencePiece())
+    train_dataloader = DataLoader(train_iter, batch_size=10, collate_fn=ToSentencePiece())
+    valid_dataloader = DataLoader(valid_iter, batch_size=10, collate_fn=ToSentencePiece())
+    test_dataloader = DataLoader(test_iter, batch_size=10, collate_fn=ToSentencePiece())
     dummy_src, dummy_tgt = next(iter(train_dataloader))
     # dummy_src = torch.rand((32, 10, 512)) # N, S, E
     # dummy_tgt = torch.rand((32, 10, 512))   

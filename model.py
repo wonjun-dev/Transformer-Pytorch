@@ -4,9 +4,11 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from torchtext.data.metrics import bleu_score
 
 from module import Encoder, Decoder
 from positional_encoding import PositionalEncoding
+from data_manager import ToSentencePiece
 
 class Transformer(pl.LightningModule):
     def __init__(self, max_len, d_model, vocab_size, p=0.1):
@@ -24,53 +26,90 @@ class Transformer(pl.LightningModule):
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)  # ignore padding
         self.lr = 0.001 # TODO transformer learning rate scheduler
 
-    def forward(self, x, tgt):
-        x = self.src_embedding(x.long()) * math.sqrt(self.d_model)
-        x = x + self.pe[:, :x.size()[1], :]
-        x = self.dropout_1(x)
+        # Data
+        self.sp = ToSentencePiece()
+        self.VOCAB_SIZE = vocab_size
+        self.MAX_LEN = 50
 
-        x = self.encoder(x)
+    def forward(self, enc_in, dec_in, is_train=True):
+        enc_in_emb = self.src_embedding(enc_in.long()) * math.sqrt(self.d_model)
+        enc_in_emb = enc_in_emb + self.pe[:, :enc_in_emb.size()[1], :]
+        enc_in_emb = self.dropout_1(enc_in_emb)
+
+        enc_out = self.encoder(enc_in_emb)
+
+        if is_train:    # Teacher forcing
+            dec_in_emb = self.tgt_embedding(dec_in.long()) * math.sqrt(self.d_model)
+            dec_in_emb = dec_in_emb + self.pe[:, :dec_in_emb.size()[1], :]
+            dec_in_emb = self.dropout_2(dec_in_emb)
+
+            dec_out = self.decoder(dec_in_emb, enc_out)    # (batch_size, tgt_max_len, d_model)
+            dec_out = self.linear(dec_out)  # (batch_size, tgt_max_len, vocab_size)
+            # x = F.log_softmax(x, dim=-1)
+            return dec_out
+
+        else:   # Auto regressive (greedy docoding)
+            batch_size = dec_in.size()[0]
         
-        tgt = self.tgt_embedding(tgt.long()) * math.sqrt(self.d_model)
-        tgt = tgt + self.pe[:, :tgt.size()[1], :]
-        tgt = self.dropout_2(tgt)
+            dec_out_v = torch.zeros((batch_size, self.MAX_LEN, self.VOCAB_SIZE))  # unormalized score
+            dec_out_i = torch.zeros((batch_size, self.MAX_LEN), dtype=torch.int16)  # greedy out
 
-        x = self.decoder(tgt, x)    # (batch_size, tgt_max_len, d_model)
-        x = self.linear(x)  # (batch_size, tgt_max_len, vocab_size)
-        # x = F.log_softmax(x, dim=-1)
+            for t in range(self.MAX_LEN):
+                dec_in_emb = self.tgt_embedding(dec_in.long()) * math.sqrt(self.d_model)
+                _dec_out = self.decoder(dec_in_emb, enc_out)
+                _dec_out = self.linear(_dec_out)
+                topv, topi = _dec_out[:, t].topk(k=1, dim=-1)
+                dec_out_v[:, t] = _dec_out[:, t]
+                dec_out_i[:, t] = topi.view(-1).int()
+                dec_in = torch.column_stack((dec_in, topi.detach().view(-1)))
+        
+            return dec_out_v, dec_out_i
 
-        return x
         
 
     def training_step(self, batch, batch_idx):
-        #TODO padding mask
+        #TODO attention key padding mask
         src, tgt = batch
-        tgt_in = tgt[:, :-1]
         tgt_out = tgt[:, 1:]
-        preds = self(src, tgt_in)    # (batch_size, tgt_max_len, vocab_size)
-        loss = self.loss_fn(preds.reshape(-1, preds.shape[-1]), tgt_out.reshape(-1))
+
+        dec_in = tgt[:, :-1]
+        score = self(src, dec_in)    # (batch_size, tgt_max_len, vocab_size)
+
+        loss = self.loss_fn(score.reshape(-1, score.shape[-1]), tgt_out.reshape(-1))
         self.log('train_loss', loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         # TODO auto regressive
         src, tgt = batch
-        tgt_in = tgt[:, :-1]
         tgt_out = tgt[:, 1:]
-        preds = self(src, tgt_in)
-        loss = self.loss_fn(preds.reshape(-1, preds.shape[-1]), tgt_out.reshape(-1))
-        self.log('val_loss', loss)
+
+        batch_size = src.size()[0]
+        self.MAX_LEN = tgt_out.size()[1]
+        dec_in = torch.LongTensor([[2] for _ in range(batch_size)])
+        score, greedy_out = self(src, dec_in, is_train=False)
+        
+        loss = self.loss_fn(score.reshape(-1, score.shape[-1]), tgt_out.reshape(-1))
+        self.log('valid_loss', loss)
+
+        # TODO BLEU score
+        tgt_out = tgt_out.tolist()
+        greedy_out = greedy_out.tolist()
+        # tgt_text = self.sp.tgt_detokenize(tgt_out)
+        # preds_txt = self.sp.tgt_detokenize(greedy_out)
+        # self.log('val_bleu_score', bleu_score(preds_txt[0].split(), [tgt_text[0].split()]))
+
         return loss
 
-    def test_step(self, batch, batch_idx):
-        # TODO auto regressive
-        src, tgt = batch
-        tgt_in = tgt[:, :-1]
-        tgt_out = tgt[:, 1:]
-        preds = self(src, tgt_in)
-        loss = self.loss_fn(preds.reshape(-1, preds.shape[-1]), tgt_out.reshape(-1))
-        self.log('val_loss', loss)
-        return loss
+    # def test_step(self, batch, batch_idx):
+    #     # TODO auto regressive
+    #     src, tgt = batch
+    #     tgt_in = tgt[:, :-1]
+    #     tgt_out = tgt[:, 1:]
+    #     preds = self(src, tgt_in)
+    #     loss = self.loss_fn(preds.reshape(-1, preds.shape[-1]), tgt_out.reshape(-1))
+    #     self.log('test_loss', loss)
+    #     return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
