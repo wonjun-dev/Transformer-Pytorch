@@ -22,6 +22,14 @@ class ToSentencePiece():
         self.EOS_IDX = self.src_sp.eos_id()
         self.PAD_IDX = self.src_sp.pad_id()
 
+    def src_detokenize(self, idxs):
+        text = self.src_sp.detokenize(idxs)
+        return text
+
+    def tgt_detokenize(self, idxs):
+        text = self.tgt_sp.detokenize(idxs)
+        return text
+
 
     def _src_to_tensor(self, txt):
         token_ids = torch.tensor(list(self.src_sp.encode_as_ids(txt)))
