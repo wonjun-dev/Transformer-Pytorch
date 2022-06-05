@@ -80,7 +80,6 @@ class Transformer(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # TODO auto regressive
         src, tgt = batch
         tgt_out = tgt[:, 1:]
 
@@ -102,7 +101,6 @@ class Transformer(pl.LightningModule):
         return loss
 
     # def test_step(self, batch, batch_idx):
-    #     # TODO auto regressive
     #     src, tgt = batch
     #     tgt_in = tgt[:, :-1]
     #     tgt_out = tgt[:, 1:]

@@ -1,6 +1,7 @@
 from multiprocessing import dummy
 from torchtext.datasets import Multi30k
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 # dummy input
 import torch
@@ -23,8 +24,10 @@ def main():
     # out = transformer(dummy_src, dummy_tgt)
     # print(out.size())
     pl.seed_everything(0)
-    trainer = pl.Trainer()
+    checkpoint_callback = ModelCheckpoint(dirpath='ckpt/', save_top_k=2, monitor='valid_loss')
+    trainer = pl.Trainer(callbacks=[checkpoint_callback])
     trainer.fit(transformer, train_dataloader, valid_dataloader)
+
 
 
 if __name__ == '__main__':
