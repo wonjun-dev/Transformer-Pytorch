@@ -16,7 +16,7 @@ class Transformer(pl.LightningModule):
         self.d_model = d_model
         self.src_embedding = nn.Embedding(vocab_size, d_model)  # TODO src, tgt vocab 사이즈 따로
         self.tgt_embedding = nn.Embedding(vocab_size, d_model)
-        self.pe = PositionalEncoding(max_len, d_model).encoding()
+        self.pe = PositionalEncoding(max_len, d_model)
         self.dropout_1 = nn.Dropout(p)
         self.dropout_2 = nn.Dropout(p)
         self.encoder = Encoder(d_model=d_model)
@@ -33,14 +33,14 @@ class Transformer(pl.LightningModule):
 
     def forward(self, enc_in, dec_in, is_train=True):
         enc_in_emb = self.src_embedding(enc_in.long()) * math.sqrt(self.d_model)
-        enc_in_emb = enc_in_emb + self.pe[:, :enc_in_emb.size()[1], :]
+        enc_in_emb = self.pe(enc_in_emb)
         enc_in_emb = self.dropout_1(enc_in_emb)
 
         enc_out = self.encoder(enc_in_emb)
 
         if is_train:    # Teacher forcing
             dec_in_emb = self.tgt_embedding(dec_in.long()) * math.sqrt(self.d_model)
-            dec_in_emb = dec_in_emb + self.pe[:, :dec_in_emb.size()[1], :]
+            dec_in_emb = self.pe(dec_in_emb)
             dec_in_emb = self.dropout_2(dec_in_emb)
 
             dec_out = self.decoder(dec_in_emb, enc_out)    # (batch_size, tgt_max_len, d_model)
@@ -56,9 +56,11 @@ class Transformer(pl.LightningModule):
 
             for t in range(self.MAX_LEN):
                 dec_in_emb = self.tgt_embedding(dec_in.long()) * math.sqrt(self.d_model)
+                
                 _dec_out = self.decoder(dec_in_emb, enc_out)
                 _dec_out = self.linear(_dec_out)
                 topv, topi = _dec_out[:, t].topk(k=1, dim=-1)
+
                 dec_out_v[:, t] = _dec_out[:, t]
                 dec_out_i[:, t] = topi.view(-1).int()
                 dec_in = torch.column_stack((dec_in, topi.detach().view(-1)))
@@ -74,7 +76,6 @@ class Transformer(pl.LightningModule):
 
         dec_in = tgt[:, :-1]
         score = self(src, dec_in)    # (batch_size, tgt_max_len, vocab_size)
-
         loss = self.loss_fn(score.reshape(-1, score.shape[-1]), tgt_out.reshape(-1))
         self.log('train_loss', loss)
         return loss
@@ -83,17 +84,26 @@ class Transformer(pl.LightningModule):
         src, tgt = batch
         tgt_out = tgt[:, 1:]
 
-        batch_size = src.size()[0]
-        self.MAX_LEN = tgt_out.size()[1]
-        dec_in = torch.LongTensor([[2] for _ in range(batch_size)])
-        score, greedy_out = self(src, dec_in, is_train=False)
+        # greedy decoding
+        # batch_size = src.size()[0]
+        # self.MAX_LEN = tgt_out.size()[1]
+        # dec_in = torch.LongTensor([[2] for _ in range(batch_size)]).to(self.device)
+        # score, greedy_out = self(src, dec_in, is_train=False)
+        # score = score.to(self.device)
         
+        # loss = self.loss_fn(score.reshape(-1, score.shape[-1]), tgt_out.reshape(-1))
+        # self.log('valid_loss', loss)
+
+        # teacher forcing
+        dec_in = tgt[:, :-1]
+        score = self(src, dec_in)    # (batch_size, tgt_max_len, vocab_size)
         loss = self.loss_fn(score.reshape(-1, score.shape[-1]), tgt_out.reshape(-1))
         self.log('valid_loss', loss)
 
+
         # TODO BLEU score
-        tgt_out = tgt_out.tolist()
-        greedy_out = greedy_out.tolist()
+        # tgt_out = tgt_out.tolist()
+        # greedy_out = greedy_out.tolist()
         # tgt_text = self.sp.tgt_detokenize(tgt_out)
         # preds_txt = self.sp.tgt_detokenize(greedy_out)
         # self.log('val_bleu_score', bleu_score(preds_txt[0].split(), [tgt_text[0].split()]))

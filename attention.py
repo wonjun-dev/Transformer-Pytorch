@@ -28,7 +28,7 @@ class MultiHeadAttention(nn.Module):
         
         if self.masking:
             max_len = scaled_weight.size()[-1]
-            mask = torch.ones(1, max_len, max_len)  # broadcasting mask to all heads
+            mask = torch.ones(1, max_len, max_len).to(scaled_weight.device)  # broadcasting mask to all heads
             mask = torch.tril(mask) # lower triangle
             scaled_weight = scaled_weight.masked_fill_(mask==0, float('-inf'))
 
