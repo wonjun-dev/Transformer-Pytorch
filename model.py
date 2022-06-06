@@ -9,6 +9,7 @@ from torchtext.data.metrics import bleu_score
 from module import Encoder, Decoder
 from positional_encoding import PositionalEncoding
 from data_manager import ToSentencePiece
+from lr_scheduler import CosineAnnealingWarmUpRestarts
 
 class Transformer(pl.LightningModule):
     def __init__(self, max_len, d_model, vocab_size, p=0.1):
@@ -24,7 +25,6 @@ class Transformer(pl.LightningModule):
         self.linear = nn.Linear(d_model, vocab_size)
         
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)  # ignore padding
-        self.lr = 0.001 # TODO transformer learning rate scheduler
 
         # Data
         self.sp = ToSentencePiece()
@@ -109,7 +109,7 @@ class Transformer(pl.LightningModule):
         # self.log('val_bleu_score', bleu_score(preds_txt[0].split(), [tgt_text[0].split()]))
 
         return loss
-
+    
     # def test_step(self, batch, batch_idx):
     #     src, tgt = batch
     #     tgt_in = tgt[:, :-1]
@@ -120,5 +120,6 @@ class Transformer(pl.LightningModule):
     #     return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.0000001)
+        scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=1, eta_max=0.001, T_up=2, gamma=0.8)
+        return [optimizer], [scheduler]

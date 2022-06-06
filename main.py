@@ -27,7 +27,7 @@ def main():
     # print(out.size())
     pl.seed_everything(0)
     checkpoint_callback = ModelCheckpoint(dirpath='ckpt/', save_top_k=2, monitor='valid_loss')
-    trainer = pl.Trainer(devices=[0], accelerator='gpu', callbacks=[checkpoint_callback])
+    trainer = pl.Trainer(devices=[0], accelerator='gpu', max_epochs=20, callbacks=[checkpoint_callback])
     trainer.fit(transformer, train_dataloader, valid_dataloader)
 
 
