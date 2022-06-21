@@ -24,18 +24,18 @@ class EncoderLayer(nn.Module):
     def forward(self, x):
         # sublayer 1 #
         identity = x
-        x = self.dropout_1(self.attention_layer(x))
-        x = x + identity # residual connection
-        x = self.layer_norm_1(x)
+        out_1 = self.dropout_1(self.attention_layer(x))
+        out_1 = out_1 + identity # residual connection
+        out_1 = self.layer_norm_1(out_1)
 
         # sublayer 2 #
-        identity = x
+        identity = out_1
         # feedforward
-        x = self.dropout_3(self.ff_2(self.dropout_2(F.relu(self.ff_1(x))))) # FFN(x) = max(0, xW1+b1)W2+b2
-        x = x + identity
-        x = self.layer_norm_2(x)
+        out_2 = self.dropout_3(self.ff_2(self.dropout_2(F.relu(self.ff_1(out_1))))) # FFN(x) = max(0, xW1+b1)W2+b2
+        out_2 = out_2 + identity
+        out_2 = self.layer_norm_2(out_2)
 
-        return x
+        return out_2
 
 
 class DecoderLayer(nn.Module):
@@ -56,23 +56,24 @@ class DecoderLayer(nn.Module):
     def forward(self, x, enc_out):
         # sublayer 1 #
         identity = x # residual connection
-        x = self.dropout_1(self.masked_attention_layer(x))
-        x = x + identity
-        x = self.layer_norm_1(x)
+        out_1 = self.dropout_1(self.masked_attention_layer(x))
+        out_1 = out_1 + identity
+        out_1 = self.layer_norm_1(out_1)
+
 
         # sublayer 2 #  # TODO encoder-decoder mutli head attention
-        identity = x
-        x = self.dropout_2(self.ende_attention_layer(x, enc_out))
-        x = x + identity
-        x = self.layer_norm_2(x)
+        identity = out_1
+        out_2 = self.dropout_2(self.ende_attention_layer(out_1, enc_out))
+        out_2 = out_2 + identity
+        out_2 = self.layer_norm_2(out_2)
 
         # sublayer 3 #
-        identity = x
-        x = self.dropout_4(self.ff_2(self.dropout_3(F.relu(self.ff_1(x))))) # FFN(x) = max(0, xW1+b1)W2+b2
-        x = x + identity
-        x = self.layer_norm_3(x)
+        identity = out_2
+        out_3 = self.dropout_4(self.ff_2(self.dropout_3(F.relu(self.ff_1(out_2))))) # FFN(x) = max(0, xW1+b1)W2+b2
+        out_3 = out_3 + identity
+        out_3 = self.layer_norm_3(out_3)
 
-        return x
+        return out_3
 
 
 class Encoder(nn.Module):
