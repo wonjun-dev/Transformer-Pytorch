@@ -6,7 +6,7 @@ from torch import nn
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, n_head, masking=False):
+    def __init__(self, d_model, n_head, p=0.1, masking=False):
         super().__init__()
         self.d_model = d_model
         self.n_head = n_head
@@ -15,6 +15,7 @@ class MultiHeadAttention(nn.Module):
         self.wk = nn.Linear(d_model, d_model, bias=False)
         self.wv = nn.Linear(d_model, d_model, bias=False)
         self.linear = nn.Linear(d_model, d_model, bias=False)
+        self.dropout = nn.Dropout(p)
 
         assert self.d_model % self.n_head == 0  # d_k = d_model / n_head 이므로 나누어 떨어져야 함
     
@@ -33,7 +34,7 @@ class MultiHeadAttention(nn.Module):
             scaled_weight = scaled_weight.masked_fill_(mask==0, float('-inf'))
 
         score= F.softmax(scaled_weight, dim=-1)
-        attention = torch.matmul(score, V)
+        attention = torch.matmul(self.dropout(score), V)
 
         return attention
 
@@ -42,19 +43,23 @@ class MultiHeadAttention(nn.Module):
         q = self.wq(x)  # (batch_size, max_len, d_model)
         k = self.wk(x)  # (batch_size, max_len, d_model)
         v = self.wv(x)  # (batch_size, max_len, d_model)
+        # print('??', q.size(), k.size(), v.size())
+        # input()
 
         # transform tensor # (batch_size, max_len, d_model) -> # (batch_size, n_head, max_len, d_k)
         batch_size = q.size()[0]
         max_len = q.size()[1]
         d_k = self.d_model // self.n_head
-        q = q.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        k = k.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        v = v.view(batch_size, max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        q = q.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
+        k = k.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
+        v = v.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
 
         attention = self.scale_dot_product_attention(q, k, v)   # (batch_size, n_head, max_len, d_k)
         attention = attention.transpose(2, 1).contiguous()
-        attention = attention.view(batch_size, max_len, -1) # Concat(head1, head2, ...)
+        attention = attention.view(batch_size, -1, self.d_model) # Concat(head1, head2, ...)
         out = self.linear(attention)
+        # print('attention', attention[0])
+
 
         return out
 
@@ -74,13 +79,13 @@ class EncoderDecoderAttention(MultiHeadAttention):
         src_max_len = k.size()[1]
         tgt_max_len = q.size()[1]
         d_k = self.d_model // self.n_head
-        q = q.view(batch_size, tgt_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        k = k.view(batch_size, src_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
-        v = v.view(batch_size, src_max_len, self.n_head, d_k).transpose(2, 1).contiguous()
+        q = q.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
+        k = k.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
+        v = v.view(batch_size, -1, self.n_head, d_k).transpose(2, 1).contiguous()
 
         attention = self.scale_dot_product_attention(q, k, v)   # (batch_size, n_head, max_len, d_k)
         attention = attention.transpose(2, 1).contiguous()
-        attention = attention.view(batch_size, tgt_max_len, -1) # Concat(head1, head2, ...)
+        attention = attention.view(batch_size, -1, self.d_model) # Concat(head1, head2, ...)
         out = self.linear(attention)
 
         return out
